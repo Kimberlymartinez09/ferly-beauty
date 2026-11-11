@@ -1,5 +1,4 @@
 ﻿from django.urls import path
-from django.views.generic import TemplateView
 from . import views
 
 app_name = 'catalogo'
@@ -11,5 +10,6 @@ urlpatterns = [
     path('carrito/remover/<int:producto_id>/', views.remover_del_carrito, name='remover'),
     path('carrito/actualizar/<int:producto_id>/', views.actualizar_cantidad, name='actualizar'),
     path('carrito/vaciar/', views.vaciar_carrito, name='vaciar'),
-    path('checkout/', TemplateView.as_view(template_name='catalogo/checkout_pendiente.html'), name='checkout'),
+    path('checkout/', views.checkout, name='checkout'),
+    path('pago-exitoso/<int:pk>/', views.pago_exitoso, name='pago_exitoso'),
 ]

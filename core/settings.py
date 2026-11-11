@@ -247,3 +247,9 @@ ACCOUNT_EMAIL_REQUIRED         = False          # no obligar correo
 ACCOUNT_EMAIL_VERIFICATION     = 'none'         # no enviar email de verificación
 ACCOUNT_LOGOUT_ON_GET          = True           # logout sin confirmar (dev)
 ACCOUNT_SESSION_REMEMBER       = True           # recordar sesión
+# core/settings.py — agregar al final (antes de JAZZMIN_SETTINGS):
+
+# ── STRIPE (Pasarela de pago) ──────────────────────────────────────────────
+STRIPE_SECRET_KEY     = env('STRIPE_SECRET_KEY',     default='sk_test_placeholder')
+STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='pk_test_placeholder')
+STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='whsec_placeholder')
