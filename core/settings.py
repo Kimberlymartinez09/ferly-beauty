@@ -1,7 +1,8 @@
 # core/settings.py
 import sys
-import environ
 from pathlib import Path
+
+import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,6 +22,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'whitenoise.runserver_nostatic',   # debe ir antes de staticfiles
     'django.contrib.staticfiles',
     'django.contrib.sites',
     # Terceros
@@ -29,8 +31,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'rest_framework',
     'rest_framework.authtoken',
-    'django_filters',              # ← nuevo (el paquete se instala como django-filter)
-    'whitenoise.runserver_nostatic',
+    'django_filters',
     # Apps del ERP
     'clientes',
     'proveedores',
@@ -38,7 +39,7 @@ INSTALLED_APPS = [
     'ventas',
     'reportes',
     'configuracion',
-    'catalogo',                    # ← nuevo
+    'catalogo',
 ]
 
 MIDDLEWARE = [
@@ -56,7 +57,6 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'core.urls'
 
 # ── Templates ─────────────────────────────────────────────────────────────
-#   # core/settings.py — actualizar TEMPLATES[0]['OPTIONS']['context_processors']:
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -68,13 +68,14 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                # Context processor del carrito — W13
+                # Context processor del carrito (W13)
                 'catalogo.context_processors.carrito_info',
             ],
         },
     },
 ]
-    
+
+WSGI_APPLICATION = 'core.wsgi.application'
 
 # ── Base de datos ─────────────────────────────────────────────────────────
 DATABASES = {
@@ -93,10 +94,8 @@ USE_TZ = True
 # ── Archivos estáticos ────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# STATICFILES_DIRS ≠ STATIC_ROOT (error frecuente)
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [BASE_DIR / 'static']   # distinto de STATIC_ROOT
 
-# STATICFILES_STORAGE fue eliminado en Django 5.1+; ahora se usa STORAGES.
 # El manifiesto de WhiteNoise solo se usa en producción (requiere collectstatic)
 if DEBUG or 'test' in sys.argv:
     _static_backend = 'django.contrib.staticfiles.storage.StaticFilesStorage'
@@ -120,14 +119,14 @@ LOGOUT_REDIRECT_URL = '/'
 # ── DRF ──────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',   # para el navegador
-        'rest_framework.authentication.TokenAuthentication',     # para clientes externos
+        'rest_framework.authentication.SessionAuthentication',   # navegador
+        'rest_framework.authentication.TokenAuthentication',     # clientes externos
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
     'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',     # ← nuevo (django-filter)
+        'django_filters.rest_framework.DjangoFilterBackend',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
@@ -235,21 +234,21 @@ SITE_ID = 1
 
 # ── AUTHENTICATION BACKENDS ───────────────────────────────────────────────
 AUTHENTICATION_BACKENDS = [
-    # Backend estándar de Django (username + password en admin)
-    'django.contrib.auth.backends.ModelBackend',
-    # Backend de allauth (permite login por email también)
-    'allauth.account.auth_backends.AuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',               # admin
+    'allauth.account.auth_backends.AuthenticationBackend',     # allauth
 ]
 
 # ── ALLAUTH: configuración para desarrollo académico ──────────────────────
-ACCOUNT_LOGIN_METHODS          = {'username'}   # login por username
-ACCOUNT_EMAIL_REQUIRED         = False          # no obligar correo
-ACCOUNT_EMAIL_VERIFICATION     = 'none'         # no enviar email de verificación
-ACCOUNT_LOGOUT_ON_GET          = True           # logout sin confirmar (dev)
-ACCOUNT_SESSION_REMEMBER       = True           # recordar sesión
-# core/settings.py — agregar al final (antes de JAZZMIN_SETTINGS):
+ACCOUNT_LOGIN_METHODS      = {'username'}
+ACCOUNT_EMAIL_REQUIRED     = False
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_LOGOUT_ON_GET      = True
+ACCOUNT_SESSION_REMEMBER   = True
 
-# ── STRIPE (Pasarela de pago) ──────────────────────────────────────────────
-STRIPE_SECRET_KEY     = env('STRIPE_SECRET_KEY',     default='sk_test_placeholder')
+# ── STRIPE (pasarela de pago) ─────────────────────────────────────────────
+# Las claves reales van en .env (no se suben a Git).
+# Los valores por defecto solo sirven para que el proyecto arranque;
+# las llamadas reales a Stripe fallarán sin claves válidas.
+STRIPE_SECRET_KEY      = env('STRIPE_SECRET_KEY',      default='sk_test_placeholder')
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='pk_test_placeholder')
-STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='whsec_placeholder')
+STRIPE_WEBHOOK_SECRET  = env('STRIPE_WEBHOOK_SECRET',  default='whsec_placeholder')

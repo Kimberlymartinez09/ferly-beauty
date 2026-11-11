@@ -15,13 +15,17 @@ Estructura del carrito en sesión:
         ...
     }
 """
+import logging
 from decimal import Decimal
 
 import stripe
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.views.generic import ListView
 
 from productos.models import Producto
@@ -34,6 +38,8 @@ from .checkout_utils import (
     obtener_o_crear_cliente,
 )
 from .filters import ProductoFilter
+
+logger = logging.getLogger(__name__)
 
 
 # ── CATÁLOGO ───────────────────────────────────────────────────────────────
@@ -183,7 +189,11 @@ def vaciar_carrito(request):
 
 @login_required
 def checkout(request):
-    """Resumen del carrito (GET) y creación de Pedido + PaymentIntent (POST)."""
+    """Resumen del carrito (GET) y creación de Pedido + PaymentIntent (POST).
+
+    En POST, el Pedido guarda un snapshot del carrito en items_snapshot,
+    para conservar nombre, cantidad y precio aunque el producto cambie después.
+    """
     carrito = _obtener_carrito(request)
     if not carrito:
         messages.warning(request, 'Tu carrito está vacío.')
@@ -209,11 +219,23 @@ def checkout(request):
     try:
         cliente = obtener_o_crear_cliente(request.user)
 
+        # Snapshot del carrito: lista de dicts serializables a JSON
+        snapshot = [
+            {
+                'producto_id': int(prod_id),
+                'nombre':      datos['nombre'],
+                'cantidad':    int(datos['cantidad']),
+                'precio':      datos['precio'],   # ya es str
+            }
+            for prod_id, datos in carrito.items()
+        ]
+
         pedido = Pedido.objects.create(
-            numero_pedido=generar_numero_pedido(),
-            cliente=cliente,
-            estado='pendiente',
-            total_pagado=totales['total'],
+            numero_pedido  = generar_numero_pedido(),
+            cliente        = cliente,
+            estado         = 'pendiente',
+            total_pagado   = totales['total'],
+            items_snapshot = snapshot,
         )
 
         intent = stripe.PaymentIntent.create(
@@ -253,3 +275,41 @@ def pago_exitoso(request, pk):
 def pago_error(request):
     """Muestra el error de pago y permite reintentar."""
     return render(request, 'catalogo/pago_error.html')
+
+
+# ── WEBHOOK DE STRIPE ──────────────────────────────────────────────────────
+
+@csrf_exempt
+@require_POST
+def stripe_webhook(request):
+    """Recibe eventos de Stripe y marca el Pedido como pagado.
+
+    Stripe no envía token CSRF, por eso la vista es csrf_exempt.
+    La firma se verifica con STRIPE_WEBHOOK_SECRET para que nadie
+    más pueda marcar pedidos como pagados.
+    """
+    payload = request.body
+    sig_header = request.META.get('HTTP_STRIPE_SIGNATURE', '')
+    secret = getattr(settings, 'STRIPE_WEBHOOK_SECRET', '')
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, secret)
+    except ValueError:
+        logger.warning('Webhook: payload inválido recibido.')
+        return HttpResponseBadRequest('Payload inválido.')
+    except stripe.SignatureVerificationError:
+        logger.warning('Webhook: firma inválida — posible ataque.')
+        return HttpResponseBadRequest('Firma inválida.')
+
+    if event['type'] == 'payment_intent.succeeded':
+        intent = event['data']['object']
+        pedido_id = intent.get('metadata', {}).get('pedido_id')
+        if pedido_id:
+            # filter().update() es idempotente: si Stripe reenvía el evento,
+            # el pedido ya no está en 'pendiente' y no cambia nada.
+            Pedido.objects.filter(pk=pedido_id, estado='pendiente').update(
+                estado='pagado'
+            )
+
+    # Otros eventos (por ejemplo payment_failed) no cambian el pedido.
+    return HttpResponse(status=200)
