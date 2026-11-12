@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Productos{% endblock %}
 {% block nav_productos %}active{% endblock %}
 
@@ -83,4 +84,14 @@
 {% else %}
 <div class="erp-alert-info">No hay productos registrados aún.</div>
 {% endif %}
+
+<div class="row g-4 mt-2">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="erp-card h-100 d-flex align-items-center justify-content-center">
+            <img src="{% static 'img/dior-lipstick.svg' %}"
+                 alt="Labial Dior"
+                 style="width:100%;height:180px;object-fit:contain;">
+        </div>
+    </div>
+</div>
 {% endblock %}

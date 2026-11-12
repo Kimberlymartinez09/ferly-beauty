@@ -1,4 +1,5 @@
 ﻿{% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Tienda{% endblock %}
 {% block nav_catalogo %}active{% endblock %}
@@ -15,13 +16,16 @@
     </div>
 </form>
 
-{% if productos %}
 <div class="row g-4">
     {% for producto in productos %}
     <div class="col-12 col-sm-6 col-lg-3">
         <div class="erp-card h-100 d-flex flex-column">
             {% if producto.imagen %}
                 <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}"
+                     class="img-fluid rounded mb-3" style="height:180px;object-fit:cover;width:100%;">
+            {% elif "dior" in producto.nombre|lower %}
+                <img src="{% static 'img/dior-lipstick.svg' %}"
+                     alt="{{ producto.nombre }} - labial Dior"
                      class="img-fluid rounded mb-3" style="height:180px;object-fit:cover;width:100%;">
             {% endif %}
             <h5 class="mb-1">{{ producto.nombre }}</h5>
@@ -52,7 +56,7 @@
 </nav>
 {% endif %}
 
-{% else %}
+{% if not productos %}
 <div class="erp-alert-info">
     No hay productos disponibles por el momento.
 </div>

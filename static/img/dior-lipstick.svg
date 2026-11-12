@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Labial Dior</title>
+  <desc id="desc">Ilustracion de un labial rojo en un estuche negro con detalles plateados.</desc>
+  <defs>
+    <linearGradient id="case" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#111114"/>
+      <stop offset=".22" stop-color="#34343a"/>
+      <stop offset=".48" stop-color="#08080a"/>
+      <stop offset=".78" stop-color="#29292e"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" x2="1">
+      <stop stop-color="#8d8d91"/>
+      <stop offset=".2" stop-color="#f5f2ef"/>
+      <stop offset=".48" stop-color="#a9a9ad"/>
+      <stop offset=".72" stop-color="#fff"/>
+      <stop offset="1" stop-color="#77777b"/>
+    </linearGradient>
+    <linearGradient id="lipstick" x1="0" x2="1" y1="0" y2="0">
+      <stop stop-color="#7c071c"/>
+      <stop offset=".35" stop-color="#e52c45"/>
+      <stop offset=".7" stop-color="#b7102c"/>
+      <stop offset="1" stop-color="#670616"/>
+    </linearGradient>
+    <filter id="shadow" x="-.4" y="-.2" width="1.8" height="1.6">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+  </defs>
+  <rect width="640" height="640" rx="34" fill="#fff5f7"/>
+  <circle cx="320" cy="285" r="205" fill="#f8e4e9"/>
+  <ellipse cx="323" cy="548" rx="155" ry="25" fill="#6e2536" opacity=".17" filter="url(#shadow)"/>
+  <g transform="rotate(-10 320 330)">
+    <path d="M264 278l8-70q2-18 17-28l31-24 31 24q15 10 17 28l8 70z" fill="url(#lipstick)"/>
+    <path d="M278 203q21 13 42 13t42-13" fill="none" stroke="#f05b6c" stroke-width="5" opacity=".65"/>
+    <path d="M264 275h112v37H264z" fill="url(#metal)"/>
+    <path d="M264 309h112v167H264z" fill="url(#case)"/>
+    <path d="M277 321v139" stroke="#fff" stroke-width="3" opacity=".18"/>
+    <path d="M363 321v139" stroke="#000" stroke-width="4" opacity=".35"/>
+    <text x="320" y="385" fill="#f4f0ed" font-family="Georgia,serif" font-size="33" text-anchor="middle">CD</text>
+    <text x="320" y="417" fill="#f4f0ed" font-family="Georgia,serif" font-size="16" text-anchor="middle" letter-spacing="4">DIOR</text>
+    <path d="M252 473h136v34H252z" fill="url(#metal)"/>
+    <path d="M242 507h156v31H242z" fill="url(#case)"/>
+    <path d="M247 538h146v11q0 12-12 12H259q-12 0-12-12z" fill="url(#case)"/>
+  </g>
+  <text x="320" y="600" fill="#57313a" font-family="Georgia,serif" font-size="17" text-anchor="middle" letter-spacing="4">ROUGE DIOR</text>
+</svg>
