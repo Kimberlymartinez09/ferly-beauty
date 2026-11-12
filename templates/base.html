@@ -169,6 +169,19 @@
         .erp-nav-link:hover, .erp-nav-link.active {
             background: #FFFFFF; color: var(--clr-title) !important;
         }
+        .erp-cart-badge {
+            background: var(--clr-gold);
+            color: #FFFFFF;
+            font-family: 'Fredoka',sans-serif;
+            font-style: normal;
+            font-size: .72rem;
+            font-weight: 600;
+            padding: .05rem .5rem;
+            border-radius: 999px;
+            border: 2px solid #FFFFFF;
+            vertical-align: middle;
+            margin-left: .15rem;
+        }
         .theme-toggle {
             background: #FFFFFF; color: var(--clr-navy);
             border: 2px solid var(--clr-gold); border-radius: 50%;
@@ -358,10 +371,7 @@
     <div class="erp-nav-links">
         <!-- E-commerce público — W13 -->
         <a href="{% url 'catalogo:catalogo' %}" class="erp-nav-link {% block nav_catalogo %}{% endblock %}">🛍️ Tienda</a>
-        <!-- Contador del carrito en la navbar -->
-        {% if carrito_total_items > 0 %}
-        <a href="{% url 'catalogo:carrito' %}" class="erp-nav-link" style="position:relative;">🛒 ({{ carrito_total_items }})</a>
-        {% endif %}
+        <a href="{% url 'catalogo:carrito' %}" class="erp-nav-link {% block nav_carrito %}{% endblock %}">🛒 Carrito{% if carrito_total_items %}<span class="erp-cart-badge">{{ carrito_total_items }}</span>{% endif %}</a>
         <a href="/productos/" class="erp-nav-link {% block nav_productos %}{% endblock %}">Productos</a>
         <a href="/clientes/" class="erp-nav-link {% block nav_clientes %}{% endblock %}">Clientes</a>
         <a href="/proveedores/" class="erp-nav-link {% block nav_proveedores %}{% endblock %}">Proveedores</a>
