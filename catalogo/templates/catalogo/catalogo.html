@@ -1,15 +1,60 @@
-﻿<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8"><title>Catalogo</title></head><body>
-<h1>Catalogo</h1>
-<form method="get">
-<input type="text" name="nombre" value="{{ request.GET.nombre }}">
-<input type="number" name="precio_max" value="{{ request.GET.precio_max }}">
-<button type="submit">Filtrar</button></form>
-<p><a href="{% url 'catalogo:carrito' %}">Ver carrito</a></p>
-<ul>
-{% for p in object_list %}
-<li><strong>{{ p.nombre }}</strong> - ${{ p.precio }}
-<form method="post" action="{% url 'catalogo:agregar' p.id %}" style="display:inline">{% csrf_token %}<button type="submit">Agregar</button></form></li>
-{% empty %}<li>No hay productos.</li>
-{% endfor %}
-</ul></body></html>
+﻿{% extends 'base.html' %}
+
+{% block title %}Tienda{% endblock %}
+{% block nav_catalogo %}active{% endblock %}
+
+{% block content %}
+<div class="erp-page-title">
+    <h2>🛍️ Tienda</h2>
+</div>
+
+<form method="get" class="row g-2 mb-4">
+    {{ filtro.form.as_p }}
+    <div class="col-auto">
+        <button type="submit" class="btn-erp-primary">Filtrar</button>
+    </div>
+</form>
+
+{% if productos %}
+<div class="row g-4">
+    {% for producto in productos %}
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="erp-card h-100 d-flex flex-column">
+            {% if producto.imagen %}
+                <img src="{{ producto.imagen.url }}" alt="{{ producto.nombre }}"
+                     class="img-fluid rounded mb-3" style="height:180px;object-fit:cover;width:100%;">
+            {% endif %}
+            <h5 class="mb-1">{{ producto.nombre }}</h5>
+            <p class="mb-2"><strong>${{ producto.precio }}</strong></p>
+            <p class="mb-3" style="font-size:.85rem;color:var(--clr-muted);">
+                Stock: {{ producto.stock }}
+            </p>
+            <form method="post" action="{% url 'catalogo:agregar' producto.pk %}" class="mt-auto">
+                {% csrf_token %}
+                <input type="hidden" name="cantidad" value="1">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn-erp-gold w-100">Agregar al carrito</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if is_paginated %}
+<nav class="mt-4 d-flex justify-content-center gap-2">
+    {% if page_obj.has_previous %}
+        <a class="btn-erp-primary btn-erp-sm" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ page_obj.previous_page_number }}">← Anterior</a>
+    {% endif %}
+    <span class="align-self-center">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+        <a class="btn-erp-primary btn-erp-sm" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode|cut:'page=' }}&{% endif %}page={{ page_obj.next_page_number }}">Siguiente →</a>
+    {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="erp-alert-info">
+    No hay productos disponibles por el momento.
+</div>
+{% endif %}
+{% endblock %}
