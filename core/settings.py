@@ -68,8 +68,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                # Context processor del carrito (W13)
-                'catalogo.context_processors.carrito_info',
+                'catalogo.context_processors.carrito_info',   # carrito (W13)
             ],
         },
     },
@@ -94,9 +93,9 @@ USE_TZ = True
 # ── Archivos estáticos ────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']   # distinto de STATIC_ROOT
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
-# El manifiesto de WhiteNoise solo se usa en producción (requiere collectstatic)
+# Manifiesto de WhiteNoise solo en producción (requiere collectstatic)
 if DEBUG or 'test' in sys.argv:
     _static_backend = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 else:
@@ -119,8 +118,8 @@ LOGOUT_REDIRECT_URL = '/'
 # ── DRF ──────────────────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',   # navegador
-        'rest_framework.authentication.TokenAuthentication',     # clientes externos
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
@@ -142,9 +141,8 @@ JAZZMIN_SETTINGS = {
     'site_brand': '📦 ERP Django',
     'welcome_sign': 'Bienvenido al Sistema ERP · UTEC Celaya',
     'copyright': 'MC. Román Fernando López González · UTEC Celaya',
-
     'site_icon': None,
-    'site_logo': None,    # ruta a logo en static/ (agregar en W11+)
+    'site_logo': None,
 
     # Búsqueda global en el admin
     'search_model': ['clientes.Cliente', 'productos.Producto'],
@@ -187,7 +185,7 @@ JAZZMIN_SETTINGS = {
 
     # Apariencia
     'related_modal_active': True,
-    'custom_css': 'erp_custom.css',   # archivo en static/
+    # 'custom_css': 'erp_custom.css',   # activar solo cuando exista static/erp_custom.css
     'show_sidebar': True,
     'navigation_expanded': True,
     'hide_apps': [],
@@ -234,8 +232,8 @@ SITE_ID = 1
 
 # ── AUTHENTICATION BACKENDS ───────────────────────────────────────────────
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',               # admin
-    'allauth.account.auth_backends.AuthenticationBackend',     # allauth
+    'django.contrib.auth.backends.ModelBackend',            # admin
+    'allauth.account.auth_backends.AuthenticationBackend',  # allauth
 ]
 
 # ── ALLAUTH: configuración para desarrollo académico ──────────────────────
@@ -246,9 +244,7 @@ ACCOUNT_LOGOUT_ON_GET      = True
 ACCOUNT_SESSION_REMEMBER   = True
 
 # ── STRIPE (pasarela de pago) ─────────────────────────────────────────────
-# Las claves reales van en .env (no se suben a Git).
-# Los valores por defecto solo sirven para que el proyecto arranque;
-# las llamadas reales a Stripe fallarán sin claves válidas.
+# Las claves reales van en .env o en las variables de Render, nunca en Git.
 STRIPE_SECRET_KEY      = env('STRIPE_SECRET_KEY',      default='sk_test_placeholder')
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='pk_test_placeholder')
 STRIPE_WEBHOOK_SECRET  = env('STRIPE_WEBHOOK_SECRET',  default='whsec_placeholder')
