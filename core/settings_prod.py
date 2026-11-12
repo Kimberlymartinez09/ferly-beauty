@@ -10,6 +10,7 @@ Variables de entorno requeridas en Render Dashboard:
     ALLOWED_HOSTS           → tu-app.onrender.com (o dejar vacío para auto)
     STRIPE_SECRET_KEY       → sk_live_... o sk_test_...
     STRIPE_PUBLISHABLE_KEY  → pk_live_... o pk_test_...
+    STRIPE_WEBHOOK_SECRET   → whsec_... (del endpoint creado en el Dashboard de Stripe)
 """
 from .settings import *  # noqa: F401,F403  hereda toda la configuración base
 import os
@@ -57,10 +58,17 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
 
 # ── STRIPE ─────────────────────────────────────────────────────────────────
+# Se leen del entorno sin valores de respaldo para que nunca se use una
+# clave de prueba inventada en producción.
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
-# ── ALMACENAMIENTO (Django 4.2+ usa STORAGES) ─────────────────────────────
+# ── ALMACENAMIENTO ─────────────────────────────────────────────────────────
+# CompressedStaticFilesStorage comprime los estáticos sin exigir un manifiesto.
+# Con CompressedManifestStaticFilesStorage, cualquier referencia a un archivo
+# que no esté en el manifiesto (como vendor/bootswatch de Jazzmin) devuelve
+# 500 en todo el admin.
 _bucket = os.environ.get('AWS_STORAGE_BUCKET_NAME', '')
 
 STORAGES = {
@@ -68,7 +76,7 @@ STORAGES = {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
     },
     'staticfiles': {
-        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
 
