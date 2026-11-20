@@ -1,18 +1,16 @@
 # core/settings.py
 import sys
+from datetime import timedelta
 from pathlib import Path
-# core/settings.py — verificar que existe al inicio:
-from datetime import timedelta   # ← agregar si no está
-
-# Si ya existe la línea, no la dupliques.
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Variables de entorno ──────────────────────────────────────────────────
 env = environ.Env(DEBUG=(bool, False))
-environ.Env.read_env(BASE_DIR / '.env')
+environ.Env.read_env(str(BASE_DIR / '.env'))
 
 SECRET_KEY = env('SECRET_KEY', default='dev-key-insegura-solo-para-desarrollo')
 DEBUG = env('DEBUG')
@@ -38,9 +36,8 @@ INSTALLED_APPS = [
     'whitenoise.runserver_nostatic',   # debe ir antes de staticfiles
     'django.contrib.staticfiles',
     'django.contrib.sites',
-    # core/settings.py — en INSTALLED_APPS, después de rest_framework:
-    'anymail',    # ← agregar
     # Terceros
+    'anymail',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -264,48 +261,16 @@ STRIPE_SECRET_KEY      = env('STRIPE_SECRET_KEY',      default='sk_test_placehol
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='pk_test_placeholder')
 STRIPE_WEBHOOK_SECRET  = env('STRIPE_WEBHOOK_SECRET',  default='whsec_placeholder')
 
-# ── CELERY — Cola de tareas asíncronas ────────────────────────────────────
-# Local (sin REDIS_URL): broker en memoria y tareas ejecutadas al instante (eager).
-# Producción (Render): define REDIS_URL y Celery usa Redis con worker real.
-REDIS_URL = env('REDIS_URL', default='')
-
-CELERY_BROKER_URL = REDIS_URL or 'memory://'
-CELERY_RESULT_BACKEND = REDIS_URL or 'cache+memory://'
-
-# Eager activado solo si no hay Redis (se puede forzar con la variable de entorno)
-CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=not REDIS_URL)
-CELERY_TASK_EAGER_PROPAGATES = True
-
-# Formato de serialización (JSON es seguro y portable)
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-
-# Zona horaria (heredar de Django)
-CELERY_TIMEZONE = TIME_ZONE
-
-# Reintentos ante fallos de conexión al broker
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-
-# Límites de tiempo por tarea (segundos)
-CELERY_TASK_SOFT_TIME_LIMIT = 300
-CELERY_TASK_TIME_LIMIT = 360
-
-# Nombre de la cola por defecto
-CELERY_TASK_DEFAULT_QUEUE = 'erp_django'
 # ── CELERY — Cola de tareas asíncronas (W16) ──────────────────────────────
-# REDIS_URL definida (Render → Key Value):
+# REDIS_URL definida (Render → Key Value o Redis local):
 #     las tareas se encolan en Redis y las procesa el worker.
-# REDIS_URL vacía (laboratorio sin Docker / tests):
-#     modo EAGER → .delay() ejecuta la tarea en el mismo proceso,
-#     sin broker ni worker. El código de las vistas no cambia.
+# REDIS_URL vacía (laboratorio sin Redis / tests):
+#     modo EAGER → .delay() ejecuta la tarea en el mismo proceso.
 REDIS_URL = env('REDIS_URL', default='')
 
 if REDIS_URL:
-    # Broker: Redis almacena los mensajes de las tareas pendientes
-    CELERY_BROKER_URL     = REDIS_URL
-    # Backend: Redis almacena los resultados de las tareas
-    CELERY_RESULT_BACKEND = REDIS_URL
+    CELERY_BROKER_URL        = REDIS_URL
+    CELERY_RESULT_BACKEND    = REDIS_URL
     CELERY_TASK_ALWAYS_EAGER = False
 else:
     CELERY_BROKER_URL        = 'memory://'
@@ -321,59 +286,22 @@ CELERY_TASK_SERIALIZER   = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
 # Zona horaria (heredar de Django)
-CELERY_TIMEZONE = TIME_ZONE   # 'America/Mexico_City'
+CELERY_TIMEZONE = TIME_ZONE
 
 # Reintentos automáticos ante fallos de conexión al broker
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # Tiempo máximo que puede correr una tarea antes de ser terminada (segundos)
 CELERY_TASK_SOFT_TIME_LIMIT = 300   # 5 minutos
-CELERY_TASK_TIME_LIMIT       = 360  # 6 minutos (hard limit)
+CELERY_TASK_TIME_LIMIT      = 360   # 6 minutos (hard limit)
 
-# Cola por defecto: debe coincidir con --queues=erp_django del worker
+# Cola por defecto: debe coincidir con -Q erp_django del worker
 CELERY_TASK_DEFAULT_QUEUE = 'erp_django'
 
 # En modo EAGER, las excepciones de la tarea se propagan (útil en tests)
 CELERY_TASK_EAGER_PROPAGATES = True
 
-# core/settings.py — configuración de correo electrónico
-
-# ── CORREO ELECTRÓNICO ────────────────────────────────────────────────────
-# En desarrollo: usar el backend de consola (imprime en terminal)
-# En producción: anymail con SendGrid
-EMAIL_BACKEND = env(
-    'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend'
-)
-
-# Dirección del remitente visible en los correos
-DEFAULT_FROM_EMAIL = env(
-    'DEFAULT_FROM_EMAIL',
-    default='ERP Django <noreply@erp-django.com>'
-)
-
-# Nombre del asunto con prefijo del sistema
-EMAIL_SUBJECT_PREFIX = '[ERP Django] '
-
-# Administradores que reciben alertas del sistema
-ADMINS = [
-    ('Admin ERP', env('ADMIN_EMAIL', default='admin@erp-django.com')),
-]
-
-# Configuración de django-anymail (SendGrid)
-SENDGRID_API_KEY = env('SENDGRID_API_KEY', default='')
-ANYMAIL = {
-    'SENDGRID_API_KEY': SENDGRID_API_KEY,
-    # Reintentar envíos fallidos automáticamente
-    'SEND_DEFAULTS': {
-        'esp_extra': {'ip_pool_name': 'transactional'},
-    },
-}
-# core/settings.py — agregar después de CELERY_TASK_ALWAYS_EAGER:
-
-# ── CELERY BEAT — Tareas programadas ──────────────────────────────────────
-from celery.schedules import crontab
-
+# ── CELERY BEAT — Tareas programadas (W18) ────────────────────────────────
 CELERY_BEAT_SCHEDULE = {
 
     # Verificar stock bajo cada hora
@@ -393,5 +321,34 @@ CELERY_BEAT_SCHEDULE = {
 
 }
 
-# Necesario para que Beat use la zona horaria de Django (no UTC)
-CELERY_BEAT_TIMEZONE = TIME_ZONE   # 'America/Mexico_City'
+# Beat usa la zona horaria de Django (no UTC)
+CELERY_BEAT_TIMEZONE = TIME_ZONE
+
+# ── CORREO ELECTRÓNICO ────────────────────────────────────────────────────
+# Desarrollo: backend de consola (imprime el correo en la terminal).
+# Producción (Render): definir EMAIL_BACKEND=anymail.backends.sendgrid.EmailBackend
+EMAIL_BACKEND = env(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend'
+)
+
+# Remitente: debe ser una dirección verificada en SendGrid
+# (Settings → Sender Authentication). Si no lo es, SendGrid rechaza el envío.
+DEFAULT_FROM_EMAIL = env(
+    'DEFAULT_FROM_EMAIL',
+    default='ERP Django <noreply@erp-django.com>'
+)
+
+# Prefijo del asunto de los correos del sistema
+EMAIL_SUBJECT_PREFIX = '[ERP Django] '
+
+# Administradores que reciben alertas y reportes del sistema
+ADMINS = [
+    ('Admin ERP', env('ADMIN_EMAIL', default='admin@erp-django.com')),
+]
+
+# Configuración de django-anymail (SendGrid)
+SENDGRID_API_KEY = env('SENDGRID_API_KEY', default='')
+ANYMAIL = {
+    'SENDGRID_API_KEY': SENDGRID_API_KEY,
+}
