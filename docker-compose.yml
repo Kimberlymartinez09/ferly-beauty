@@ -109,6 +109,25 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-erp_user}:${POSTGRES_PASSWORD:-erp_pass_local}@db:5432/${POSTGRES_DB:-erp_db}
       REDIS_URL: redis://redis:6379/0
 
+    # ── Celery Beat — Scheduler de tareas programadas — W18 ────────────
+  celery_beat:
+    build: .
+    restart: unless-stopped
+    # Beat NUNCA debe tener múltiples réplicas (un solo scheduler)
+    command: celery -A core beat -l info
+    volumes:
+      - .:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings_prod
+      SECRET_KEY:             dev-clave-docker-no-usar-en-produccion
+      DATABASE_URL:           postgres://erp_user:erp_pass_local@db:5432/erp_db
+      REDIS_URL:              redis://redis:6379/0
+
 volumes:
   postgres_data:
   static_volume:
