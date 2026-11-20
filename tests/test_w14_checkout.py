@@ -17,6 +17,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from catalogo.views         import obtener_o_crear_cliente
 from clientes.models        import Cliente
 from configuracion.models   import ConfiguracionERP
 from productos.models       import Categoria, Producto
@@ -145,7 +146,9 @@ class PagoExitosoTest(TestCase):
         )
         self.client.force_login(self.user)
 
-        cli = Cliente.objects.create(nombre='C', correo='c@t.com')
+        # La vista solo muestra pedidos del cliente logueado, así que el
+        # pedido se crea para el cliente vinculado a este usuario.
+        cli = obtener_o_crear_cliente(self.user)
         self.pedido = Pedido.objects.create(
             numero_pedido='PED-2025-0001',
             cliente=cli,

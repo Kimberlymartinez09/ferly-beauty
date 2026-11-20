@@ -12,7 +12,7 @@ urlpatterns = [
     path('carrito/actualizar/<int:producto_id>/', views.actualizar_cantidad, name='actualizar'),
     path('carrito/vaciar/', views.vaciar_carrito, name='vaciar'),
     path('checkout/', views.checkout, name='checkout'),
-    path('pago-exitoso/<int:pk>/', views.pago_exitoso, name='pago_exitoso'),
+    path('pago-exitoso/<int:pedido_id>/', views.pago_exitoso, name='pago_exitoso'),
     path('pago-error/', views.pago_error, name='pago_error'),
     path('webhook/', webhook_views.stripe_webhook, name='webhook'),
 ]

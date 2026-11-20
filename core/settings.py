@@ -7,12 +7,21 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ── Variables de entorno ──────────────────────────────────────────────────
-env = environ.Env(DEBUG=(bool, True))
+env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(BASE_DIR / '.env')
 
 SECRET_KEY = env('SECRET_KEY', default='dev-key-insegura-solo-para-desarrollo')
-DEBUG = env('DEBUG', default=True)
+DEBUG = env('DEBUG')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+
+# Render define esta variable automáticamente con tu dominio
+RENDER_EXTERNAL_HOSTNAME = env('RENDER_EXTERNAL_HOSTNAME', default='')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+if RENDER_EXTERNAL_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS.append(f'https://{RENDER_EXTERNAL_HOSTNAME}')
 
 # ── Apps instaladas ───────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -248,3 +257,75 @@ ACCOUNT_SESSION_REMEMBER   = True
 STRIPE_SECRET_KEY      = env('STRIPE_SECRET_KEY',      default='sk_test_placeholder')
 STRIPE_PUBLISHABLE_KEY = env('STRIPE_PUBLISHABLE_KEY', default='pk_test_placeholder')
 STRIPE_WEBHOOK_SECRET  = env('STRIPE_WEBHOOK_SECRET',  default='whsec_placeholder')
+
+# ── CELERY — Cola de tareas asíncronas ────────────────────────────────────
+# Local (sin REDIS_URL): broker en memoria y tareas ejecutadas al instante (eager).
+# Producción (Render): define REDIS_URL y Celery usa Redis con worker real.
+REDIS_URL = env('REDIS_URL', default='')
+
+CELERY_BROKER_URL = REDIS_URL or 'memory://'
+CELERY_RESULT_BACKEND = REDIS_URL or 'cache+memory://'
+
+# Eager activado solo si no hay Redis (se puede forzar con la variable de entorno)
+CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=not REDIS_URL)
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# Formato de serialización (JSON es seguro y portable)
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Zona horaria (heredar de Django)
+CELERY_TIMEZONE = TIME_ZONE
+
+# Reintentos ante fallos de conexión al broker
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Límites de tiempo por tarea (segundos)
+CELERY_TASK_SOFT_TIME_LIMIT = 300
+CELERY_TASK_TIME_LIMIT = 360
+
+# Nombre de la cola por defecto
+CELERY_TASK_DEFAULT_QUEUE = 'erp_django'
+# ── CELERY — Cola de tareas asíncronas (W16) ──────────────────────────────
+# REDIS_URL definida (Render → Key Value):
+#     las tareas se encolan en Redis y las procesa el worker.
+# REDIS_URL vacía (laboratorio sin Docker / tests):
+#     modo EAGER → .delay() ejecuta la tarea en el mismo proceso,
+#     sin broker ni worker. El código de las vistas no cambia.
+REDIS_URL = env('REDIS_URL', default='')
+
+if REDIS_URL:
+    # Broker: Redis almacena los mensajes de las tareas pendientes
+    CELERY_BROKER_URL     = REDIS_URL
+    # Backend: Redis almacena los resultados de las tareas
+    CELERY_RESULT_BACKEND = REDIS_URL
+    CELERY_TASK_ALWAYS_EAGER = False
+else:
+    CELERY_BROKER_URL        = 'memory://'
+    CELERY_RESULT_BACKEND    = 'cache+memory://'
+    CELERY_TASK_ALWAYS_EAGER = True
+
+# Los resultados caducan en 1 hora (el Key Value gratuito tiene 25 MB)
+CELERY_RESULT_EXPIRES = 3600
+
+# Formato de serialización (JSON es seguro y portable)
+CELERY_ACCEPT_CONTENT    = ['json']
+CELERY_TASK_SERIALIZER   = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+
+# Zona horaria (heredar de Django)
+CELERY_TIMEZONE = TIME_ZONE   # 'America/Mexico_City'
+
+# Reintentos automáticos ante fallos de conexión al broker
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Tiempo máximo que puede correr una tarea antes de ser terminada (segundos)
+CELERY_TASK_SOFT_TIME_LIMIT = 300   # 5 minutos
+CELERY_TASK_TIME_LIMIT       = 360  # 6 minutos (hard limit)
+
+# Cola por defecto: debe coincidir con --queues=erp_django del worker
+CELERY_TASK_DEFAULT_QUEUE = 'erp_django'
+
+# En modo EAGER, las excepciones de la tarea se propagan (útil en tests)
+CELERY_TASK_EAGER_PROPAGATES = True

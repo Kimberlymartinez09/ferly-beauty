@@ -1,8 +1,9 @@
 # catalogo/webhook_views.py
-"""Webhook de Stripe — W15.
+"""Webhook de Stripe — W15 + W16.
 
 Recibe eventos de Stripe y actualiza el estado del Pedido:
-    payment_intent.succeeded      → pedido 'pagado' y stock descontado.
+    payment_intent.succeeded      → pedido 'pagado', stock descontado
+                                    y tarea de confirmación encolada (W16).
     payment_intent.payment_failed → pedido 'cancelado'.
 
 La firma se verifica con STRIPE_WEBHOOK_SECRET. El procesamiento es
@@ -20,6 +21,7 @@ from django.views.decorators.http import require_POST
 
 from productos.models import Producto
 from ventas.models import Pedido
+from ventas.tasks import enviar_confirmacion_pedido   # W16
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,8 @@ def stripe_webhook(request):
         return HttpResponse(status=200)
 
     if event['type'] == 'payment_intent.succeeded':
+        pedido_confirmado_id = None
+
         with transaction.atomic():
             pedido = (
                 Pedido.objects.select_for_update()
@@ -68,6 +72,19 @@ def stripe_webhook(request):
                     )
                 pedido.estado = 'pagado'
                 pedido.save(update_fields=['estado'])
+                pedido_confirmado_id = pedido.pk
+
+        # W16: se encola FUERA de la transacción, cuando el pago ya quedó
+        # guardado. Si Redis falla, se registra el error pero Stripe recibe
+        # 200 (si respondiera 500, Stripe reintentaría el webhook).
+        if pedido_confirmado_id is not None:
+            try:
+                enviar_confirmacion_pedido.delay(pedido_confirmado_id)
+            except Exception:
+                logger.exception(
+                    f'No se pudo encolar la confirmación del pedido '
+                    f'{pedido_confirmado_id}'
+                )
 
     elif event['type'] == 'payment_intent.payment_failed':
         Pedido.objects.filter(pk=pedido_id, estado='pendiente').update(
