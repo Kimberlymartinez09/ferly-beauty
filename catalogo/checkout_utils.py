@@ -62,17 +62,34 @@ def armar_items(carrito: dict) -> list:
     return items
 
 
-def obtener_o_crear_cliente(user) -> Cliente:
-    """Obtiene o crea un Cliente del ERP vinculado al usuario Django.
+class CorreoClienteFaltante(ValueError):
+    """Se lanza cuando no hay un correo válido para el cliente."""
 
-    Usa el correo del usuario si existe; si no, genera uno temporal.
+
+def obtener_o_crear_cliente(user, correo=None) -> Cliente:
+    """Obtiene o crea un Cliente del ERP vinculado a la compra.
+
+    El correo se toma en este orden:
+        1. El que el cliente escribió en el checkout (parámetro `correo`).
+        2. El correo guardado en el usuario Django.
+
+    Ya no se genera un correo temporal como 'usuario@erp.local', porque
+    esa dirección no existe y los correos de confirmación nunca llegan.
+
+    Raises:
+        CorreoClienteFaltante: si no hay ningún correo disponible.
     """
-    correo = user.email or f'{user.username}@erp.local'
+    correo_final = (correo or user.email or '').strip().lower()
+    if not correo_final:
+        raise CorreoClienteFaltante(
+            'El cliente no tiene correo. Pide el correo en el checkout.'
+        )
+
     nombre_completo = user.get_full_name()
     nombre = nombre_completo or user.username
 
     cliente, creado = Cliente.objects.get_or_create(
-        correo=correo,
+        correo=correo_final,
         defaults={'nombre': nombre, 'activo': True},
     )
 

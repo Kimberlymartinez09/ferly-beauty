@@ -70,7 +70,7 @@ class ConfiguracionERP(models.Model):
         obj, _ = cls.objects.get_or_create(
             pk=1,
             defaults={
-                'nombre_empresa': 'Mi Empresa ERP',
+                'nombre_empresa': 'Ferly Beauty',
                 'moneda':         'MXN',
                 'iva_porcentaje': Decimal('16.00'),
             }
