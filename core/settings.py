@@ -8,6 +8,15 @@ from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _env_limpio(nombre, default=''):
+    """Lee una variable de entorno y quita comillas sobrantes copiadas en Render."""
+    valor = env(nombre, default=default)
+    if isinstance(valor, str):
+        return valor.strip().strip('"').strip("'")
+    return valor
+
+
 # ── Variables de entorno ──────────────────────────────────────────────────
 env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(str(BASE_DIR / '.env'))
@@ -266,7 +275,7 @@ STRIPE_WEBHOOK_SECRET  = env('STRIPE_WEBHOOK_SECRET',  default='whsec_placeholde
 #     las tareas se encolan en Redis y las procesa el worker.
 # REDIS_URL vacía (laboratorio sin Redis / tests):
 #     modo EAGER → .delay() ejecuta la tarea en el mismo proceso.
-REDIS_URL = env('REDIS_URL', default='')
+REDIS_URL = _env_limpio('REDIS_URL')
 
 if REDIS_URL:
     CELERY_BROKER_URL        = REDIS_URL
@@ -298,8 +307,9 @@ CELERY_TASK_TIME_LIMIT      = 360   # 6 minutos (hard limit)
 # Cola por defecto: debe coincidir con -Q erp_django del worker
 CELERY_TASK_DEFAULT_QUEUE = 'erp_django'
 
-# En modo EAGER, las excepciones de la tarea se propagan (útil en tests)
-CELERY_TASK_EAGER_PROPAGATES = True
+# Las excepciones NO se propagan al que llama: así un fallo al enviar el correo
+# no hace que el webhook de Stripe responda con error y Stripe reintente el evento.
+CELERY_TASK_EAGER_PROPAGATES = False
 
 # ── CELERY BEAT — Tareas programadas (W18) ────────────────────────────────
 CELERY_BEAT_SCHEDULE = {
@@ -325,18 +335,24 @@ CELERY_BEAT_SCHEDULE = {
 CELERY_BEAT_TIMEZONE = TIME_ZONE
 
 # ── CORREO ELECTRÓNICO ────────────────────────────────────────────────────
-# Desarrollo: backend de consola (imprime el correo en la terminal).
-# Producción (Render): definir EMAIL_BACKEND=anymail.backends.sendgrid.EmailBackend
-EMAIL_BACKEND = env(
+# Producción (Render): EMAIL_BACKEND se activa solo si existe SENDGRID_API_KEY.
+# Desarrollo: sin clave, el correo se imprime en la terminal.
+SENDGRID_API_KEY = _env_limpio('SENDGRID_API_KEY')
+
+EMAIL_BACKEND = _env_limpio(
     'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend'
+    default=(
+        'anymail.backends.sendgrid.EmailBackend'
+        if SENDGRID_API_KEY
+        else 'django.core.mail.backends.console.EmailBackend'
+    ),
 )
 
-# Remitente: debe ser una dirección verificada en SendGrid
-# (Settings → Sender Authentication). Si no lo es, SendGrid rechaza el envío.
-DEFAULT_FROM_EMAIL = env(
+# Remitente: debe ser EXACTAMENTE una dirección verificada en SendGrid
+# (Settings → Sender Authentication → Verify a Single Sender).
+DEFAULT_FROM_EMAIL = _env_limpio(
     'DEFAULT_FROM_EMAIL',
-    default='ERP Django <noreply@erp-django.com>'
+    default='Ferly Beauty <noreply@erp-django.com>',
 )
 
 # Prefijo del asunto de los correos del sistema
@@ -344,11 +360,10 @@ EMAIL_SUBJECT_PREFIX = '[ERP Django] '
 
 # Administradores que reciben alertas y reportes del sistema
 ADMINS = [
-    ('Admin ERP', env('ADMIN_EMAIL', default='admin@erp-django.com')),
+    ('Admin ERP', _env_limpio('ADMIN_EMAIL', default='admin@erp-django.com')),
 ]
 
 # Configuración de django-anymail (SendGrid)
-SENDGRID_API_KEY = env('SENDGRID_API_KEY', default='')
 ANYMAIL = {
     'SENDGRID_API_KEY': SENDGRID_API_KEY,
 }
