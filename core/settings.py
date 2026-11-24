@@ -373,9 +373,5 @@ ANYMAIL = {
 NOMBRE_EMPRESA = _env_limpio('NOMBRE_EMPRESA', default='Ferly Beauty')
 SITE_URL = _env_limpio(
     'SITE_URL',
-    default=(
-        f'https://{RENDER_EXTERNAL_HOSTNAME}'
-        if RENDER_EXTERNAL_HOSTNAME
-        else 'http://localhost:8000'
-    ),
+    default='https://erp-django-utec-f6i3.onrender.com',
 )

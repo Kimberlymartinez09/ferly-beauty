@@ -8,7 +8,6 @@ Idempotencia:
     se llama más de una vez para el mismo pedido.
 """
 import logging
-from decimal import Decimal
 
 from celery import shared_task
 from django.conf import settings
@@ -39,7 +38,7 @@ def enviar_confirmacion_pedido(self, pedido_id: int) -> dict:
         dict con estado, pedido_id y correo del destinatario.
     """
     from configuracion.models import ConfiguracionERP  # import local
-    from ventas.models        import Pedido             # import local
+    from ventas.models import Pedido                   # import local
 
     try:
         pedido = Pedido.objects.select_related('cliente').get(pk=pedido_id)
@@ -65,10 +64,7 @@ def enviar_confirmacion_pedido(self, pedido_id: int) -> dict:
 
     # ── Construir contexto del correo ───────────────────────────────────
     items = pedido.items_snapshot or []
-    url_pedido = (
-        f"https://erp-django-utec.onrender.com"
-        f"/ventas/{pedido.pk}/"
-    )
+    url_pedido = f'{settings.SITE_URL}/ventas/{pedido.pk}/'
 
     contexto = {
         'pedido':     pedido,
@@ -79,26 +75,26 @@ def enviar_confirmacion_pedido(self, pedido_id: int) -> dict:
 
     # ── Renderizar templates ────────────────────────────────────────────
     # render_to_string sin request (las tareas Celery no tienen request)
-    asunto     = (
+    asunto = (
         f'Confirmación de pedido {pedido.numero_pedido} '
         f'— {config.nombre_empresa}'
     )
     texto_plano = render_to_string(
         'emails/confirmacion_pedido.txt', contexto
     )
-    html_body   = render_to_string(
+    html_body = render_to_string(
         'emails/confirmacion_pedido.html', contexto
     )
 
     # ── Construir el correo ────────────────────────────────────────────
     correo_destino = pedido.cliente.correo
-    correo_origen  = settings.DEFAULT_FROM_EMAIL
+    correo_origen = settings.DEFAULT_FROM_EMAIL
 
     mensaje = EmailMultiAlternatives(
-        subject      = asunto,
-        body         = texto_plano,      # versión texto plano (fallback)
-        from_email   = correo_origen,
-        to           = [correo_destino],
+        subject=asunto,
+        body=texto_plano,      # versión texto plano (fallback)
+        from_email=correo_origen,
+        to=[correo_destino],
     )
     mensaje.attach_alternative(html_body, 'text/html')
 
@@ -186,34 +182,32 @@ def _enviar_alerta_stock(productos_bajos: list, umbral: int) -> None:
     from configuracion.models import ConfiguracionERP   # import local
 
     config = ConfiguracionERP.get_instance()
-    fecha  = timezone.now().strftime('%d/%m/%Y %H:%M')
+    fecha = timezone.localtime().strftime('%d/%m/%Y %H:%M')
 
-    url_admin = (
-        'https://erp-django-utec.onrender.com/admin/productos/producto/'
-    )
+    url_admin = f'{settings.SITE_URL}/admin/productos/producto/'
 
     contexto = {
-        'productos_bajos':  productos_bajos,
-        'total_productos':  len(productos_bajos),
-        'umbral':           umbral,
-        'fecha':            fecha,
-        'url_admin':        url_admin,
-        'config':           config,
+        'productos_bajos': productos_bajos,
+        'total_productos': len(productos_bajos),
+        'umbral':          umbral,
+        'fecha':           fecha,
+        'url_admin':       url_admin,
+        'config':          config,
     }
 
-    asunto      = (
+    asunto = (
         f'[ALERTA] {len(productos_bajos)} producto(s) con stock < {umbral}'
     )
-    texto_plano = render_to_string('emails/alerta_stock.txt',  contexto)
-    html_body   = render_to_string('emails/alerta_stock.html', contexto)
+    texto_plano = render_to_string('emails/alerta_stock.txt', contexto)
+    html_body = render_to_string('emails/alerta_stock.html', contexto)
 
     admin_nombre, admin_correo = settings.ADMINS[0]
 
     mensaje = EmailMultiAlternatives(
-        subject    = asunto,
-        body       = texto_plano,
-        from_email = settings.DEFAULT_FROM_EMAIL,
-        to         = [admin_correo],
+        subject=asunto,
+        body=texto_plano,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[admin_correo],
     )
     mensaje.attach_alternative(html_body, 'text/html')
 
@@ -226,7 +220,6 @@ def _enviar_alerta_stock(productos_bajos: list, umbral: int) -> None:
     except Exception as exc:
         logger.error(f'[stock_bajo] Error al enviar alerta: {exc}')
 
-# ventas/tasks.py — agregar al final del archivo
 
 @shared_task(
     bind=True,
@@ -236,119 +229,29 @@ def _enviar_alerta_stock(productos_bajos: list, umbral: int) -> None:
 def reporte_ventas_diario(self) -> dict:
     """Genera y envía el reporte diario de ventas al administrador.
 
-    Se ejecuta automáticamente a las 8:00 AM todos los días
-    mediante Celery Beat (configurado en CELERY_BEAT_SCHEDULE).
-
-    Cálculos realizados en SQL (no en Python) para máxima eficiencia:
-        - Total de pedidos pagados hoy
-        - Total facturado (suma de total_pagado)
-        - Top 5 productos por ingreso del día
+    Se ejecuta automáticamente a las 8:00 AM (hora México) con Celery Beat
+    (configurado en CELERY_BEAT_SCHEDULE). La lógica vive en core/reportes.py.
 
     Returns:
-        dict con total_pedidos, total_facturado y top_productos.
+        dict con fecha, total_pedidos, total_facturado y top_productos.
     """
-    from decimal import Decimal
+    from core.reportes import construir_contexto_reporte, enviar_reporte_ventas
 
-    from django.db.models import (
-        DecimalField, ExpressionWrapper, F, Sum,
-    )
-    from django.utils import timezone
-
-    from configuracion.models import ConfiguracionERP   # import local
-    from ventas.models        import DetalleVenta, Pedido  # import local
-
-    hoy    = timezone.localdate()
-    config = ConfiguracionERP.get_instance()
-
-    # ── 1. KPIs del día ───────────────────────────────────────────────
-    pedidos_hoy = Pedido.objects.filter(
-        fecha_pedido__date=hoy,
-        estado='pagado'
-    )
-    total_pedidos   = pedidos_hoy.count()
-    total_facturado = pedidos_hoy.aggregate(
-        total=Sum('total_pagado')
-    )['total'] or Decimal('0.00')
-
-    # ── 2. Top 5 productos por ingreso del día ─────────────────────────
-    top_productos = list(
-        DetalleVenta.objects
-        .filter(venta__fecha__date=hoy)
-        .values(nombre=F('producto__nombre'))
-        .annotate(
-            unidades=Sum('cantidad'),
-            ingreso=Sum(
-                ExpressionWrapper(
-                    F('cantidad') * F('precio_unitario'),
-                    output_field=DecimalField(max_digits=12, decimal_places=2)
-                )
-            )
-        )
-        .order_by('-ingreso')[:5]
-    )
-
-    logger.info(
-        f'[reporte_diario] {hoy}: {total_pedidos} pedidos, '
-        f'${total_facturado} facturados, '
-        f'{len(top_productos)} productos top.'
-    )
-
-    # ── 3. Enviar correo al admin si está configurado ──────────────────
-    if settings.ADMINS:
-        _enviar_reporte_ventas(
-            hoy, total_pedidos, total_facturado, top_productos, config
-        )
-
-    return {
-        'fecha':           str(hoy),
-        'total_pedidos':   total_pedidos,
-        'total_facturado': str(total_facturado),
-        'top_productos':   top_productos,
-    }
-
-
-def _enviar_reporte_ventas(
-    fecha, total_pedidos, total_facturado, top_productos, config
-) -> None:
-    """Envía el reporte diario al primer administrador configurado.
-
-    Args:
-        fecha:           Objeto date del día reportado.
-        total_pedidos:   Número de pedidos pagados.
-        total_facturado: Decimal con la suma total.
-        top_productos:   Lista de dicts con nombre, unidades, ingreso.
-        config:          Instancia de ConfiguracionERP.
-    """
-    url_admin = (
-        'https://erp-django-utec.onrender.com/admin/ventas/venta/'
-    )
-    fecha_str = fecha.strftime('%d/%m/%Y')
-
-    contexto = {
-        'fecha':           fecha_str,
-        'config':          config,
-        'total_pedidos':   total_pedidos,
-        'total_facturado': total_facturado,
-        'top_productos':   top_productos,
-        'url_admin':       url_admin,
-    }
-
-    asunto      = f'Reporte de ventas del {fecha_str} — {config.nombre_empresa}'
-    texto_plano = render_to_string('emails/reporte_ventas.txt',  contexto)
-    html_body   = render_to_string('emails/reporte_ventas.html', contexto)
-
-    admin_nombre, admin_correo = settings.ADMINS[0]
-
-    mensaje = EmailMultiAlternatives(
-        subject    = asunto,
-        body       = texto_plano,
-        from_email = settings.DEFAULT_FROM_EMAIL,
-        to         = [admin_correo],
-    )
-    mensaje.attach_alternative(html_body, 'text/html')
+    contexto = construir_contexto_reporte()
 
     try:
-        mensaje.send()
-        logger.info(f'[reporte_diario] Reporte enviado a {admin_correo}.')
+        enviar_reporte_ventas(contexto=contexto)
+        logger.info(
+            f"[reporte_diario] Reporte del {contexto['fecha']} enviado: "
+            f"{contexto['total_pedidos']} pedidos."
+        )
     except Exception as exc:
         logger.error(f'[reporte_diario] Error al enviar reporte: {exc}')
+        raise self.retry(exc=exc, countdown=60)
+
+    return {
+        'fecha':           contexto['fecha'],
+        'total_pedidos':   contexto['total_pedidos'],
+        'total_facturado': contexto['total_facturado'],
+        'top_productos':   contexto['top_productos'],
+    }
