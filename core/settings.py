@@ -8,6 +8,10 @@ from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ── Variables de entorno ──────────────────────────────────────────────────
+env = environ.Env(DEBUG=(bool, False))
+environ.Env.read_env(str(BASE_DIR / '.env'))
+
 
 def _env_limpio(nombre, default=''):
     """Lee una variable de entorno y quita comillas sobrantes copiadas en Render."""
@@ -16,10 +20,6 @@ def _env_limpio(nombre, default=''):
         return valor.strip().strip('"').strip("'")
     return valor
 
-
-# ── Variables de entorno ──────────────────────────────────────────────────
-env = environ.Env(DEBUG=(bool, False))
-environ.Env.read_env(str(BASE_DIR / '.env'))
 
 SECRET_KEY = env('SECRET_KEY', default='dev-key-insegura-solo-para-desarrollo')
 DEBUG = env('DEBUG')
@@ -98,6 +98,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 # ── Base de datos ─────────────────────────────────────────────────────────
+# En producción, settings_prod.py la sobrescribe con DATABASE_URL.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -352,7 +353,7 @@ EMAIL_BACKEND = _env_limpio(
 # (Settings → Sender Authentication → Verify a Single Sender).
 DEFAULT_FROM_EMAIL = _env_limpio(
     'DEFAULT_FROM_EMAIL',
-    default='Ferly Beauty <noreply@erp-django.com>',
+    default='Ferly Beauty <kf.belmanm.2528@cbtis198.edu.mx>',
 )
 
 # Prefijo del asunto de los correos del sistema
@@ -360,10 +361,21 @@ EMAIL_SUBJECT_PREFIX = '[ERP Django] '
 
 # Administradores que reciben alertas y reportes del sistema
 ADMINS = [
-    ('Admin ERP', _env_limpio('ADMIN_EMAIL', default='admin@erp-django.com')),
+    ('Admin ERP', _env_limpio('ADMIN_EMAIL', default='kf.belmanm.2528@cbtis198.edu.mx')),
 ]
 
 # Configuración de django-anymail (SendGrid)
 ANYMAIL = {
     'SENDGRID_API_KEY': SENDGRID_API_KEY,
 }
+
+# ── DATOS DE LA EMPRESA (usados en el reporte de ventas) ──────────────────
+NOMBRE_EMPRESA = _env_limpio('NOMBRE_EMPRESA', default='Ferly Beauty')
+SITE_URL = _env_limpio(
+    'SITE_URL',
+    default=(
+        f'https://{RENDER_EXTERNAL_HOSTNAME}'
+        if RENDER_EXTERNAL_HOSTNAME
+        else 'http://localhost:8000'
+    ),
+)
