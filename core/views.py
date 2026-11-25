@@ -3,8 +3,11 @@
 
 Migración: HttpResponse → render() con templates y contexto.
 """
+from django.conf import settings
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import NoReverseMatch, reverse
+from django.utils.crypto import constant_time_compare
 
 
 def _url(nombre, respaldo='/'):
@@ -63,3 +66,30 @@ def bienvenida(request):
         },
     ]
     return render(request, 'bienvenida.html', {'modulos': modulos})
+
+
+def enviar_reporte_ahora(request):
+    """Envía el reporte de ventas al instante.
+
+    Acceso: usuario staff con sesión iniciada, o ?token=... igual a la
+    variable de entorno REPORTE_TOKEN.
+    """
+    from core.reportes import construir_contexto_reporte, enviar_reporte_ventas
+
+    token_esperado = getattr(settings, 'REPORTE_TOKEN', '')
+    token = request.GET.get('token', '')
+    autorizado = bool(token_esperado) and constant_time_compare(token, token_esperado)
+    if not (autorizado or request.user.is_staff):
+        return JsonResponse({'estado': 'no autorizado'}, status=403)
+
+    try:
+        contexto = construir_contexto_reporte()
+        enviar_reporte_ventas(contexto=contexto)
+    except Exception as exc:
+        return JsonResponse({'estado': 'error', 'detalle': str(exc)}, status=500)
+
+    return JsonResponse({
+        'estado': 'enviado',
+        'fecha': contexto['fecha'],
+        'total_pedidos': contexto['total_pedidos'],
+    })

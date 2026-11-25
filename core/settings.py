@@ -386,3 +386,5 @@ SITE_URL = _env_limpio(
     'SITE_URL',
     default='https://erp-django-utec-f6i3.onrender.com',
 )
+# Token para disparar el reporte desde un enlace (definir en Render)
+REPORTE_TOKEN = _env_limpio('REPORTE_TOKEN')
