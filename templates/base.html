@@ -264,6 +264,7 @@
             transition: background .2s, transform .15s;
         }
         .btn-erp-gold:hover { background: var(--clr-amber); color: #5A2A45; transform: scale(1.04); }
+        .btn-erp-gold:disabled { opacity: .7; cursor: wait; transform: none; }
         .btn-erp-danger {
             background: var(--clr-danger); color: #FFF; border: none;
             border-radius: 999px; padding: .4rem 1.1rem;
@@ -383,6 +384,11 @@
         {% else %}
             <a href="/accounts/login/" class="erp-nav-link">Entrar</a>
         {% endif %}
+        {% if user.is_staff %}
+            <!-- Botón: envía el reporte de ventas a tu correo (solo administradora) -->
+            <button type="button" id="btnReporte" class="btn-erp-gold btn-erp-sm"
+                    title="Enviar el reporte de ventas a mi correo">📊 Enviar reporte</button>
+        {% endif %}
         <button class="theme-toggle" id="themeBtn" title="Modo claro/oscuro">🌙</button>
     </div>
 </nav>
@@ -465,6 +471,37 @@
     layer.appendChild(frag);
 })();
 </script>
+
+{% if user.is_staff %}
+<!-- Botón "Enviar reporte": manda el reporte de ventas a tu correo -->
+<script>
+(function () {
+    var btn = document.getElementById('btnReporte');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+        var texto = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+        try {
+            var r = await fetch('{% url "reporte_ahora" %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                credentials: 'same-origin'
+            });
+            var d = await r.json();
+            alert(r.ok
+                ? '¡Reporte enviado a tu correo! (' + d.total_pedidos + ' pedidos hoy)'
+                : 'No se pudo enviar: ' + (d.detalle || d.estado));
+        } catch (e) {
+            alert('Error de conexión. Intenta de nuevo.');
+        }
+        btn.disabled = false;
+        btn.textContent = texto;
+    });
+})();
+</script>
+{% endif %}
+
 {% block extra_js %}{% endblock %}
 </body>
 </html>

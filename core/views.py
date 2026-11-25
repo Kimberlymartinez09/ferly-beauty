@@ -71,15 +71,22 @@ def bienvenida(request):
 def enviar_reporte_ahora(request):
     """Envía el reporte de ventas al instante.
 
-    Acceso: usuario staff con sesión iniciada, o ?token=... igual a la
-    variable de entorno REPORTE_TOKEN.
+    - POST: solo usuarios staff con sesión iniciada (botón de la tienda).
+    - GET:  ?token=... igual a REPORTE_TOKEN (para cron-job.org),
+            o usuario staff con sesión iniciada.
     """
     from core.reportes import construir_contexto_reporte, enviar_reporte_ventas
 
-    token_esperado = getattr(settings, 'REPORTE_TOKEN', '')
-    token = request.GET.get('token', '')
-    autorizado = bool(token_esperado) and constant_time_compare(token, token_esperado)
-    if not (autorizado or request.user.is_staff):
+    if request.method == 'POST':
+        autorizado = request.user.is_staff
+    else:
+        token_esperado = getattr(settings, 'REPORTE_TOKEN', '')
+        token = request.GET.get('token', '')
+        autorizado = (
+            bool(token_esperado) and constant_time_compare(token, token_esperado)
+        ) or request.user.is_staff
+
+    if not autorizado:
         return JsonResponse({'estado': 'no autorizado'}, status=403)
 
     try:
