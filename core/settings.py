@@ -313,6 +313,14 @@ CELERY_TASK_DEFAULT_QUEUE = 'erp_django'
 CELERY_TASK_EAGER_PROPAGATES = False
 
 # ── CELERY BEAT — Tareas programadas (W18) ────────────────────────────────
+# Hora del reporte diario (HH:MM, hora México). Se cambia con la variable
+# REPORTE_DIARIO_HORA en Render; por defecto 08:00.
+_hora_reporte = _env_limpio('REPORTE_DIARIO_HORA', default='08:00')
+try:
+    _rep_hora, _rep_min = (int(x) for x in _hora_reporte.split(':'))
+except ValueError:
+    _rep_hora, _rep_min = 8, 0
+
 CELERY_BEAT_SCHEDULE = {
 
     # Verificar stock bajo cada hora
@@ -323,14 +331,17 @@ CELERY_BEAT_SCHEDULE = {
         'options':  {'queue': 'erp_django'},
     },
 
-    # Reporte de ventas diario a las 8:00 AM (hora México)
-    'reporte-ventas-diario-8am': {
+    # Reporte de ventas diario
+    'reporte-ventas-diario': {
         'task':     'ventas.reporte_ventas_diario',
-        'schedule': crontab(hour=8, minute=0),
+        'schedule': crontab(hour=_rep_hora, minute=_rep_min),
         'options':  {'queue': 'erp_django'},
     },
 
 }
+
+# Beat usa la zona horaria de Django (no UTC)
+CELERY_BEAT_TIMEZONE = TIME_ZONE
 
 # Beat usa la zona horaria de Django (no UTC)
 CELERY_BEAT_TIMEZONE = TIME_ZONE
